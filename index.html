@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StudyTrail 学习轨迹</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="logo">📘 StudyTrail <span>学习轨迹</span></div>
+  <nav>
+    <button data-tab="map" class="active">知识地图</button>
+    <button data-tab="add">添加材料</button>
+    <button data-tab="review">今日复习 <span id="review-badge" class="badge hidden">0</span></button>
+    <button data-tab="stats">数据统计</button>
+  </nav>
+</header>
+
+<main>
+  <!-- 知识地图 -->
+  <section id="tab-map" class="tab active">
+    <h2>我的知识地图</h2>
+    <p class="hint">学习材料会自动整理为知识卡片，并挂到对应主题下。</p>
+    <div id="map-container"></div>
+  </section>
+
+  <!-- 添加材料 -->
+  <section id="tab-add" class="tab">
+    <h2>添加学习材料</h2>
+    <p class="hint">粘贴任意学习材料（课堂笔记、文章、微信里收藏的干货……），AI 会自动提取知识点并归类到你的主题地图。</p>
+    <div class="form-row">
+      <input id="material-title" type="text" placeholder="材料标题，例如：产品课第 3 讲笔记">
+      <input id="material-topic" type="text" list="topic-list" placeholder="主题（可留空，自动归类）">
+      <datalist id="topic-list"></datalist>
+    </div>
+    <textarea id="material-text" rows="10" placeholder="在此粘贴材料原文……"></textarea>
+    <button id="btn-generate" class="primary">✨ 生成知识卡片</button>
+    <div id="add-result" class="hidden"></div>
+  </section>
+
+  <!-- 今日复习 -->
+  <section id="tab-review" class="tab">
+    <h2>今日复习</h2>
+    <div id="review-empty" class="hidden">
+      <p class="hint">🎉 今天没有到期的卡片。去「添加材料」添加新的学习内容吧！</p>
+    </div>
+    <div id="review-box" class="hidden">
+      <div class="card-quiz">
+        <div id="quiz-topic" class="quiz-topic"></div>
+        <div id="quiz-question" class="quiz-question"></div>
+        <button id="btn-reveal" class="primary">显示答案</button>
+        <div id="quiz-answer" class="quiz-answer hidden"></div>
+        <div id="quiz-rating" class="quiz-rating hidden">
+          <p>回忆起来了吗？</p>
+          <button class="rate" data-grade="0">😅 完全忘了</button>
+          <button class="rate" data-grade="2">🤔 想了半天</button>
+          <button class="rate" data-grade="4">🙂 想起来了</button>
+          <button class="rate" data-grade="5">😎 太简单了</button>
+        </div>
+      </div>
+      <div id="review-progress"></div>
+    </div>
+  </section>
+
+  <!-- 数据统计 -->
+  <section id="tab-stats" class="tab">
+    <h2>数据统计</h2>
+    <div class="stats-grid" id="stats-grid"></div>
+    <h3>各主题掌握度</h3>
+    <p class="hint">掌握度 = 已掌握卡片数 / 该主题全部卡片数（连续答对 2 次视为已掌握）。</p>
+    <div id="topic-mastery"></div>
+  </section>
+</main>
+
+<footer>
+  <p>StudyTrail 原型 v0.1 · 数据保存在浏览器本地 · <a href="https://github.com/xmy-lab/studytrail" target="_blank">GitHub 源码</a></p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
