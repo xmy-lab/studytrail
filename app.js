@@ -20,9 +20,10 @@ function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 /* ---------- 本地“AI”卡片生成 ---------- */
 
 // 简易中文停用词表（原型版；生产版交给 LLM）
-const STOPWORDS = new Set(("的了和是就都而及与著或一个我们你们他们它这那也又被把上下中大小"
- + "之以为于其但是因为所以如果虽然然而因此不没很还再又只有些什么样如何可以"
- + "the a an of to in and is are was for on with that this it as by be or").split(" "));
+const STOPWORDS = new Set([
+  ..."的了和是就都而及与著或一个我们你们他们它这那也又被把上下中大小之以为于其但不没很还再只有些什么样如何可以因为所以如果虽然然而因此指种用的于最通过".split(""),
+  ..."the a an of to in and is are was for on with that this it as by be or".split(" "),
+]);
 
 // 常见定义/要点句式：命中即视为一个知识点候选
 const DEF_PATTERNS = [
@@ -46,24 +47,37 @@ function extractKeywords(sentences) {
       const w = t.toLowerCase();
       if (!STOPWORDS.has(w)) freq[w] = (freq[w] || 0) + 2;
     }
-    for (let n = 2; n <= 4; n++) {
+    for (let n = 2; n <= 6; n++) {
+      const cjk = new RegExp("^[\\u4e00-\\u9fa5]{" + n + "}$"); // {n} 需构造，字面量不插值
       for (let i = 0; i + n <= s.length; i++) {
         const w = s.slice(i, i + n);
-        if (/^[\u4e00-\u9fa5]{n}$/.test(w) && !STOPWORDS.has(w)) {
+        if (cjk.test(w) && !STOPWORDS.has(w)) {
           freq[w] = (freq[w] || 0) + 1;
         }
       }
     }
   }
-  return Object.entries(freq)
-    .filter(([w, c]) => c >= 3 && w.length >= 2)
+  const ranked = Object.entries(freq)
+    .filter(([w, c]) => c >= 3 && w.length >= 2 && !/[是指的了在把被和与及或最通过而让够需能够]/.test(w))
     .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
     .map(([w]) => w);
+  return ranked;
+}
+
+// 泛词不做考点：太宽泛，做成卡片没有复习价值
+const GENERIC = new Set(["数据", "模型", "生成", "任务", "文本", "技术", "学习", "语言", "训练", "算子", "参数"]);
+
+function longestKeyword(sentence, keywords) {
+  let best = null;
+  for (const k of keywords) {
+    if (sentence.toLowerCase().includes(k.toLowerCase()) && (!best || k.length > best.length)) best = k;
+  }
+  return best;
 }
 
 function topicOf(sentence, keywords, fallback) {
-  for (const k of keywords) if (sentence.includes(k)) return k;
-  return fallback;
+  // 优先取句中出现的最长关键词，避免泛词抢走主题
+  return longestKeyword(sentence, keywords) || fallback;
 }
 
 function makeCard(front, back, topic, source) {
@@ -88,17 +102,18 @@ function generateCards(title, text, forcedTopic) {
       if (m && m[1] && !STOPWORDS.has(m[1])) { front = m[1].trim(); break; }
     }
     if (!front) {
-      // 无定义句式：取句子中命中的最高频关键词作为考点
-      const kw = keywords.find(k => s.includes(k));
-      if (!kw) continue;
+      // 无定义句式：取句子中命中的最长关键词作为考点
+      const kw = longestKeyword(s, keywords);
+      if (!kw || GENERIC.has(kw)) continue;
       front = kw;
       // 挖空式问题
       back = s;
     }
     if (front.length < 2 || front.length > 18) continue;
+    if (cards.some(c => c.front === front)) continue; // 同名考点去重
     const topic = forcedTopic || topicOf(s, keywords, title || "未分类");
     cards.push(makeCard(front, back, topic, title || "未分类"));
-    if (cards.length >= 12) break; // 单份材料最多 12 张，防刷屏
+    if (cards.length >= 20) break; // 单份材料最多 20 张，防刷屏
   }
   return cards;
 }
@@ -151,6 +166,19 @@ function deleteCard(id) {
   delete state.cards[id];
   save();
 }
+
+/* ---------- 示例材料（演示用） ---------- */
+
+const SAMPLE_TITLE = "AI 入门知识卡";
+const SAMPLE_TEXT = `机器学习是指让计算机从数据中自动学习规律、而无需人工编写具体规则的技术。机器学习的核心思想是用数据代替规则。机器学习分为监督学习、无监督学习和强化学习三大类。
+监督学习是指用带标签的数据训练模型的学习方式。监督学习最常用于分类和回归任务。无监督学习是指让模型在没有标签的数据中自己发现结构的学习方式。聚类是无监督学习最典型的应用。
+神经网络是一种模拟人脑神经元连接方式的计算模型。神经网络由输入层、隐藏层和输出层组成。深度学习是指使用多层神经网络进行学习的方法。深度学习是机器学习的一个分支。深度学习需要大量数据和算力作为支撑。
+大语言模型是指用海量文本训练出来的、能够理解和生成自然语言的模型。大语言模型通过预测下一个词来学习语言规律。上下文窗口是指大语言模型一次能读取的最大文本长度。Token 是大语言模型处理文本的基本单位，一个汉字通常是一到两个 token。
+提示工程是指通过设计输入文本来引导大语言模型产生更好输出的技术。提示工程是最经济的模型优化手段。少样本提示是指在提示词中给出几个示例让模型模仿的技术。
+检索增强生成是指先从外部知识库检索相关资料、再让模型基于资料回答问题的技术。检索增强生成能有效减少幻觉。幻觉是指大语言模型一本正经地编造错误事实的现象。幻觉是大语言模型落地最大的障碍之一。
+微调是指在预训练模型基础上用特定数据继续训练的方法。微调适合让模型掌握特定领域的知识。智能体是指能够自主感知环境、制定计划并调用工具完成任务的 AI 系统。智能体的核心能力是任务分解与工具调用。MCP 是一种把 AI 模型连接到外部工具和数据的标准协议。
+参数量是指模型中可学习权重的总数，通常用来衡量模型规模。训练是指用数据调整模型参数的过程。推理是指训练好的模型对输入生成输出的过程。过拟合是指模型把训练数据背得太死、遇到新数据表现变差的现象。
+Embedding 是指把文本转换成向量以表示语义的技术。语义相近的文本在向量空间中距离更近。`;
 
 /* ---------- UI 渲染 ---------- */
 
@@ -262,6 +290,14 @@ $("#btn-generate").addEventListener("click", () => {
     `。可在「知识地图」中查看，或到「今日复习」开始测验。</div>`;
   $("#material-text").value = "";
   render();
+});
+
+$("#btn-sample").addEventListener("click", () => {
+  $("#material-title").value = SAMPLE_TITLE;
+  $("#material-text").value = SAMPLE_TEXT;
+  $("#material-topic").value = "";
+  $("#add-result").className = "";
+  $("#add-result").innerHTML = `<div class="ok">已载入示例材料（${SAMPLE_TEXT.length} 字），点击「生成知识卡片」即可看到效果。</div>`;
 });
 
 $("#btn-reveal").addEventListener("click", () => {
